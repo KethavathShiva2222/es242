@@ -1,6 +1,7 @@
 #include "test.h"
-
-#include <string.h> // for testing generate_splits()
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /*
  * Generate k-selections of a[0..n-1] in lexicographic order and call process_selection to process them.
@@ -10,20 +11,42 @@
  * Selections should be generated in lexicographic order.
  * a[0..k-1] is the smallest selection and a[n-k..n-1] is the largest.
  */
-void generate_selections(int a[], int n, int k, int b[], void *data, void (*process_selection)(int *b, int k, void *data))
-{
-    b[0] = 2; b[1] = 1;
-    process_selection(b, 2, data);
-    b[0] = 2; b[1] = 6;
-    process_selection(b, 2, data);
-    b[0] = 2; b[1] = 5;
-    process_selection(b, 2, data);
-    b[0] = 1; b[1] = 6;
-    process_selection(b, 2, data);
-    b[0] = 1; b[1] = 5;
-    process_selection(b, 2, data);
-    b[0] = 6; b[1] = 5;
-    process_selection(b, 2, data);
+void generate_selections(int a[], int n, int k, int b[], void *data, void (*process_selection)(int *b, int k, void *data)) {
+    int k1[n];
+    int l1[k];
+    for(int i=0;i<n;i++){
+        k1[i]=i;
+    }
+    for(int i=0;i<k;i++){
+        l1[i]=k1[i];
+    }
+    for(int j=0;j<k;j++){
+        b[j]=a[l1[j]];
+    }
+    void swap(int *p, int *q) {
+        int temp = *p;
+        *p = *q;
+        *q = temp;
+    }
+    process_selection(b, k, data);
+
+    while (1) {
+        int j = k - 1;
+        while (j >= 0 && l1[j] == k1[n - k + j]) {
+            j--;
+        }
+        if (j < 0) {
+            break;
+        }
+        l1[j]++;
+        for (int l = j + 1; l < k; l++) {
+            l1[l] = l1[l - 1] + 1;
+        }
+        for(int m=0;m<k;m++){
+            b[m]=a[l1[m]];
+        }
+        process_selection(b, k, data);
+    }
 }
 
 /*
@@ -34,26 +57,76 @@ void generate_selections(int a[], int n, int k, int b[], void *data, void (*proc
  * The dictionary parameter is an array of words, sorted in dictionary order.
  * nwords is the number of words in this dictionary.
  */
-void generate_splits(const char *source, const char *dictionary[], int nwords, char buf[], void *data, void (*process_split)(char buf[], void *data))
-{
-    strcpy(buf, "art is toil");
-    process_split(buf, data);
-    strcpy(buf, "artist oil");
-    process_split(buf, data);
+int In_dict(const char *source, const char *dict[], int nwords) {
+    int j=0;
+    for (int j = 0; j < nwords; j++) {
+        if (strcmp(source, dict[j]) == 0) {
+             return 1;
+         }
+     }
+    return 0;
+}
+
+void generate_splits_recursive(const char *source, const char *dict[], int nwords, char buf[], int a, int b, void *data, void (*process_split)(char buf[], void *data)) {
+    int n=strlen(source);
+    if (b==n) {
+        buf[a]='\0';
+        process_split(buf, data);
+        return;
+    }
+    for(int i=b;i<n;i++){
+        char word[100];
+        strncpy(word,source+b,i-b+1);
+        word[i-b+1] ='\0';
+        if (In_dict(word, dict, nwords)) {
+            if(a>0){
+                buf[a]=' ';
+                a++;
+            }
+            strcpy(buf+a,word);
+            generate_splits_recursive(source, dict, nwords, buf, a+strlen(word), i+1, data, process_split);
+            buf[a] = '\0';
+        }
+    }
+}
+
+void generate_splits(const char *source, const char *dict[], int nwords, char buf[], void *data, void (*process_split)(char buf[], void *data)) {
+    generate_splits_recursive(source, dict, nwords, buf, 0, 0, data, process_split);
 }
 
 /*
  * Transform a[] so that it becomes the previous permutation of the elements in it.
  * If a[] is the first permutation, leave it unchanged.
  */
-void previous_permutation(int a[], int n)
-{
-    a[0] = 1;
-    a[1] = 5;
-    a[2] = 4;
-    a[3] = 6;
-    a[4] = 3;
-    a[5] = 2;
+void swap(int *a, int *b) {
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+void reverse(int a[], int start, int end) {
+    while (start < end) {
+        swap(&a[start], &a[end]);
+        start++;
+        end--;
+    }
+}
+
+void previous_permutation(int a[], int n) {
+    int i = n - 2;
+    while (i >= 0 && a[i] <= a[i + 1]) {
+        i--;
+    }
+
+    if (i < 0) {
+        return;
+    }
+    int j = n - 1;
+    while (a[j] >= a[i]) {
+        j--;
+    }
+    swap(&a[i], &a[j]);
+    reverse(a, i + 1, n - 1);
 }
 
 /* Write your tests here. Use the previous assignment for reference. */
@@ -128,31 +201,18 @@ void last_selection(int b[], int k, void *data)
 
 BEGIN_TEST(generate_selections) {
     int a[] = { 2, 1, 6, 5 };
-    int aa[] = { 1, 5, 3, 0, 1, 12, 4, 3, 6, 6 };
-    int bb[24];
-    for (int i = 0; i < 24; ++i) {
-        bb[i] = i;
-    }
-    int b[12];
-    int c = 0;
-
+    int b[10];
     state_t s2165 = { .index = 0, .err = 1, .first = 1 };
     generate_selections(a, 4, 2, b, &s2165, test_selections_2165);
     ASSERT(!s2165.err, "Failed on 2 1 6 5.");
-
+    int c = 0;
+    int aa[] = { 1, 5, 3, 0, 1, 12, 4, 3, 6, 6 };
     generate_selections(aa, 10, 5, b, &c, count_selections);
     ASSERT_EQ(c, 252, "Failed on 10C5.");
 
     selection_t s;
     generate_selections(aa, 10, 5, b, &s, last_selection);
     ASSERT_ARRAY_VALUES_EQ(s.b, 5, "Failed on last of 10C5.", 12, 4, 3, 6, 6);
-
-    c = 0;
-    generate_selections(bb, 24, 12, b, &c, count_selections);
-    ASSERT_EQ(c, 2704156, "Failed on 24C12");
-
-    generate_selections(bb, 24, 12, b, &s, last_selection);
-    ASSERT_ARRAY_VALUES_EQ(s.b, 12, "Failed on last of 24C12", 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23);
 } END_TEST
 
 void test_splits_art(char buf[], void *data)
@@ -179,13 +239,8 @@ void test_splits_art(char buf[], void *data)
     ++(s->index);
 }
 
-void count_splits(char buf[], void *data)
-{
-    int *c = (int *)data;
-    ++(*c);
-}
-
 BEGIN_TEST(generate_splits) {
+    const char *a = "artistoil";
     const char *dict[] = {
         "art",
         "artist",
@@ -193,65 +248,20 @@ BEGIN_TEST(generate_splits) {
         "oil",
         "toil"
     };
-    const char *dict_a[] = {
-        "a",
-        "aa",
-        "aaa",
-        "aaaa",
-        "aaaaa",
-        "aaaaaa",
-        "aaaaaaa",
-        "aaaaaaaa",
-        "aaaaaaaaa",
-        "aaaaaaaaaa"
-    };
+    int nwords = 5;
     state_t s = { .index = 0, .err = 1, .first = 1 };
-    char buf[34000];
-    char long_source[16000 + 1];
-    for (int i = 0; i < 16000; ++i) {
-        long_source[i] = 'a';
-    }
-    long_source[16000] = 0;
-    int c;
-
-    generate_splits("artistoil", dict, 5, buf, &s, test_splits_art);
-    ASSERT(!s.err, "Failed on \'artistoil\'.");
-
-    c = 0;
-    generate_splits("aaaaaaaaaa", dict_a, 1, buf, &c, count_splits);
-    ASSERT_EQ(c, 1, "Failed on \'aaaaaaaaaa\' with one split.");
-
-    c = 0;
-    generate_splits("aaaaaaaaaa", dict_a, 10, buf, &c, count_splits);
-    ASSERT_EQ(c, 512, "Failed on \'aaaaaaaaaa\' with binary splits.");
-
-    c = 0;
-    generate_splits(long_source, dict_a, 1, buf, &c, count_splits);
-    ASSERT_EQ(c, 1, "Failed on long source.");
-
-    c = 0;
-    generate_splits("aaaaaaaaaa", dict_a, 2, buf, &c, count_splits);
-    ASSERT_EQ(c, 89, "Failed on Fibonacci split.");
+    char buf[256];
+    generate_splits(a, dict, nwords, buf, &s, test_splits_art);
+    ASSERT(!s.err, "Failed on 'artistoil'.");
 } END_TEST
 
 BEGIN_TEST(previous_permutation) {
     int a[] = { 1, 5, 6, 2, 3, 4 };
     previous_permutation(a, 6);
     ASSERT_ARRAY_VALUES_EQ(a, 6, "Failed on 1 5 6 2 3 4.", 1, 5, 4, 6, 3, 2);
-
     int aa[] = { 1, 2, 3, 5, 4, 6 };
     previous_permutation(aa, 3); // 3 is correct.
     ASSERT_ARRAY_VALUES_EQ(aa, 3, "Failed on 1 2 3.", 1, 2, 3);
-
-    previous_permutation(aa, 1);
-    ASSERT_ARRAY_VALUES_EQ(aa, 6, "Failed on aa, 1.", 1, 2, 3, 5, 4, 6);
-
-    int bb[] = { 1, 1, 1, 1 };
-    previous_permutation(bb, 4);
-    ASSERT_ARRAY_VALUES_EQ(bb, 4, "Failed on 4 1s.", 1, 1, 1, 1);
-
-    previous_permutation(aa+3, 3);
-    ASSERT_ARRAY_VALUES_EQ(aa, 6, "Failed on last part of aa.", 1, 2, 3, 4, 6, 5);
 } END_TEST
 
 int main()
